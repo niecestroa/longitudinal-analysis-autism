@@ -1,54 +1,66 @@
-# Last Editted: December 12, 2025
+# LAST EDITTED: December 14, 2025
 # Longitudinal autism analysis – Option B:
-# pymer4 (lme4 syntax) + pandas + seaborn + tableone
+# pymer4 (R's lme4 inside Python) + pandas + seaborn + tableone
+# This is the closest possible match to your R script.
 
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
 
-from pymer4.models import Lmer
-from tableone import TableOne
-import statsmodels.api as sm
+# ============================
+# IMPORTS
+# ============================
 
-sns.set(style="whitegrid")
+import pandas as pd              # pandas = Python's data frame library (similar to tidyverse)
+import numpy as np               # numpy = numerical computing
+import seaborn as sns            # seaborn = high-level plotting (like ggplot2 themes)
+import matplotlib.pyplot as plt  # matplotlib = plotting backend
+
+from pymer4.models import Lmer   # Lmer = Python wrapper for R's lme4::lmer()
+from tableone import TableOne    # Python version of R's tableone
+import statsmodels.api as sm     # for QQ plots and diagnostics
+
+sns.set(style="whitegrid")       # sets a ggplot-like theme
 
 
 # ============================
 # 1. LOAD + CLEAN DATA
 # ============================
 
+# In R: read_csv("path") %>% mutate(...)
+# In Python: pd.read_csv() + .astype("category")
 autism = (
     pd.read_csv(
         r"~/BIST0650 Applied Longitudinal Data Analysis/BIST0650 Final Project/BIST050_Project_Data/autism.csv"
     )
 )
 
-# Convert to categorical (matches R)
+# Convert variables to categorical (R uses factor(); Python uses .astype("category"))
 autism["sicdegp"] = pd.Categorical(autism["sicdegp"], categories=["low", "med", "high"], ordered=True)
 autism["bestest2"] = autism["bestest2"].astype("category")
 autism["gender"] = autism["gender"].astype("category")
 autism["race"] = autism["race"].astype("category")
 autism["childid"] = autism["childid"].astype("category")
 
-print(autism.info())
-print(autism.head())
+print(autism.info())   # R equivalent: str(autism)
+print(autism.head())   # R equivalent: head(autism)
 
 
 # ============================
 # 2. SUMMARY STATISTICS
 # ============================
 
+# R: summary(autism)
 print("\n=== Summary ===")
 print(autism.describe(include="all"))
 
+# R: n_distinct(childid)
 print("\n=== Unique subjects ===")
 print(autism["childid"].nunique())
 
+# R: table(variable)
 for col in ["childid", "age", "age2", "vsae", "obs", "gender", "race", "sicdegp", "bestest2"]:
     print(f"\n=== Count: {col} ===")
     print(autism[col].value_counts(dropna=False))
 
+# R: mean(vsae)
 print("\n=== Mean VSAE ===")
 print(autism["vsae"].mean())
 
@@ -60,6 +72,7 @@ print(autism["vsae"].mean())
 myVars = ["age", "bestest2", "gender", "race", "sicdegp"]
 catVars = ["age", "age2", "bestest2", "childid", "gender", "obs", "race", "sicdegp", "vsae"]
 
+# Python TableOne is nearly identical to R's version
 def print_tableone(groupby):
     print(f"\n=== TableOne stratified by {groupby} ===")
     t1 = TableOne(
@@ -79,6 +92,8 @@ for g in ["bestest2", "gender", "race", "sicdegp", "obs"]:
 # 4. VISUALIZATIONS
 # ============================
 
+# R: ggplot(autism, aes(...)) + geom_boxplot()
+# Python: seaborn.boxplot()
 def boxplot_var(var):
     plt.figure(figsize=(6, 4))
     sns.boxplot(data=autism, x=var, y="vsae")
@@ -89,7 +104,8 @@ def boxplot_var(var):
 for v in ["sicdegp", "age", "age2", "gender", "race", "bestest2", "obs"]:
     boxplot_var(v)
 
-# Spaghetti plot
+# R: ggplot spaghetti plot with geom_line(aes(group=childid))
+# Python: must loop manually unless using plotnine (Option C)
 plt.figure(figsize=(8, 5))
 for cid, df_sub in autism.groupby("childid"):
     plt.plot(df_sub["age"], df_sub["vsae"], alpha=0.3)
@@ -99,7 +115,7 @@ plt.title("VSAE Score Over Time by Child")
 plt.tight_layout()
 plt.show()
 
-# Stratified spaghetti plots
+# Faceted spaghetti plots (similar to facet_grid in ggplot2)
 def spaghetti_facet(by):
     g = sns.FacetGrid(autism, col=by, col_wrap=3, sharey=True, sharex=True, height=3)
     g.map_dataframe(
@@ -123,13 +139,19 @@ for by in ["bestest2", "race", "gender", "sicdegp"]:
 # 5. MIXED MODELS (pymer4)
 # ============================
 
+# pymer4 uses R's lme4 syntax directly:
+#   Lmer("vsae ~ age * sicdegp + (age | childid)", data=df)
+# This is the closest possible match to your R code.
+
 def fit_lmer(formula, data=autism):
     print(f"\n=== Lmer Model: {formula} ===")
-    model = Lmer(formula, data=data)
-    result = model.fit()
+    model = Lmer(formula, data=data)   # R's lmer() inside Python
+    result = model.fit()               # returns R-style summary
     print(result)
     return model, result
 
+# R: anova(m1, m2)
+# pymer4: model1.compare(model2)
 def compare_lmer(form1, form2, data=autism):
     print(f"\n=== Comparing Models ===")
     print(f"Model 1: {form1}")
@@ -139,7 +161,7 @@ def compare_lmer(form1, form2, data=autism):
     m2, r2 = fit_lmer(form2, data)
 
     print("\n=== Likelihood Ratio Test ===")
-    print(m1.compare(m2))
+    print(m1.compare(m2))  # identical to R's anova(m1, m2)
 
     return m1, m2
 
@@ -200,6 +222,8 @@ final_age_model, final_age_result = fit_lmer(
 
 # Choose final model for diagnostics
 model = final_age_model
+
+# pymer4 predict() = fitted values
 autism["fitted"] = model.predict()
 autism["resid"] = autism["vsae"] - autism["fitted"]
 autism["abs_resid"] = autism["resid"].abs()
@@ -245,6 +269,7 @@ plt.tight_layout()
 plt.show()
 
 # 5. Random effects diagnostics
+# pymer4 stores random effects in model.ranef
 re_df = model.ranef.reset_index().rename(columns={"index": "childid"})
 
 plt.figure(figsize=(6, 4))
