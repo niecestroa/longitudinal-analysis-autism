@@ -1,0 +1,354 @@
+### *Tidyverse pipelines • Clean modeling workflow • Reproducible structure*
+
+```r
+---
+title: "BIST0650 Project"
+author: "Aaron Niecestro"
+date: "1/10/2026"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tableone)
+library(lme4)
+library(lmerTest)
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# ============================
+# 1. LOAD + CLEAN DATA
+# ============================
+
+```{r}
+autism <- read_csv(
+  "~/BIST0650 Applied Longitudinal Data Analysis/BIST0650 Final Project/BIST050_Project_Data/autism.csv"
+) %>%
+  mutate(
+    sicdegp  = factor(sicdegp, levels = c("low", "med", "high")),
+    bestest2 = factor(bestest2),
+    gender   = factor(gender),
+    race     = factor(race)
+  )
+
+glimpse(autism)
+```
+
+# ============================
+# 2. SUMMARY STATISTICS
+# ============================
+
+```{r}
+autism %>% summary()
+autism %>% head()
+autism %>% dim()
+
+autism %>% distinct(childid) %>% nrow()
+
+autism %>% count(childid)
+autism %>% count(age)
+autism %>% count(age2)
+autism %>% count(vsae)
+autism %>% count(obs)
+autism %>% count(gender)
+autism %>% count(race)
+autism %>% count(sicdegp)
+autism %>% count(bestest2)
+
+autism %>% summarise(mean_vsae = mean(vsae, na.rm = TRUE))
+```
+
+# ============================
+# 3. TABLEONE SUMMARIES
+# ============================
+
+```{r}
+myVars  <- c("age", "bestest2", "gender", "race", "sicdegp")
+catVars <- c("age", "age2", "bestest2", "childid", "gender", "obs", "race", "sicdegp", "vsae")
+
+list(
+  bestest2 = CreateTableOne(vars = myVars, strata = "bestest2", data = autism, factorVars = catVars),
+  gender   = CreateTableOne(vars = myVars, strata = "gender",   data = autism, factorVars = catVars),
+  race     = CreateTableOne(vars = myVars, strata = "race",     data = autism, factorVars = catVars),
+  sicdegp  = CreateTableOne(vars = myVars, strata = "sicdegp",  data = autism, factorVars = catVars),
+  obs      = CreateTableOne(vars = myVars, strata = "obs",      data = autism, factorVars = catVars)
+) %>%
+  map(~ print(.x, formatOptions = list(big.mark = ",")))
+```
+
+# ============================
+# 4. VISUALIZATIONS
+# ============================
+
+```{r}
+plot_box <- function(var) {
+  autism %>%
+    ggplot(aes(x = as.factor({{var}}), y = vsae)) +
+    geom_boxplot() +
+    theme_bw()
+}
+
+plot_box(sicdegp)
+plot_box(age)
+plot_box(age2)
+plot_box(gender)
+plot_box(race)
+plot_box(bestest2)
+plot_box(obs)
+```
+
+### Spaghetti Plot
+
+```{r}
+spag.plot <- autism %>%
+  ggplot(aes(x = age, y = vsae, group = childid, color = factor(childid))) +
+  geom_line(alpha = 0.6) +
+  labs(title = "VSAE Score Over Time", y = "VSAE Score", x = "Age (years)") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+spag.plot
+```
+
+### Stratified Spaghetti Plots
+
+```{r}
+spag.plot + facet_grid(. ~ bestest2)
+spag.plot + facet_grid(. ~ race)
+spag.plot + facet_grid(. ~ gender)
+spag.plot + facet_grid(. ~ sicdegp)
+```
+
+# ============================
+# 5. MIXED MODELS (PIPELINE STYLE)
+# ============================
+
+# Helper function for model comparison
+```{r}
+fit_compare <- function(form1, form2, data = autism) {
+  m1 <- lmer(form1, data = data)
+  m2 <- lmer(form2, data = data)
+  list(
+    model1 = summary(m1),
+    model2 = summary(m2),
+    anova  = anova(m1, m2)
+  )
+}
+```
+
+### Question A: Language
+
+```{r}
+fit_compare(
+  vsae ~ age + sicdegp + (age | childid),
+  vsae ~ age * sicdegp + (age | childid)
+)
+```
+
+### Question B: Diagnosis
+
+```{r}
+fit_compare(
+  vsae ~ age + bestest2 + (age | childid),
+  vsae ~ age * bestest2 + (age | childid)
+)
+```
+
+### Question C: Gender
+
+```{r}
+fit_compare(
+  vsae ~ age + gender + (age | childid),
+  vsae ~ age * gender + (age | childid)
+)
+```
+
+### Question C: Race
+
+```{r}
+fit_compare(
+  vsae ~ age + race + (age | childid),
+  vsae ~ age * race + (age | childid)
+)
+```
+
+### Gender × Race
+
+```{r}
+fit_compare(
+  vsae ~ age + gender + race + (age | childid),
+  vsae ~ age + gender + race + gender * race + (age | childid)
+)
+```
+
+# ============================
+# 6. FINAL MODELS
+# ============================
+
+### Final Model Using age2
+
+```{r}
+final.model.rand <- lmer(
+  vsae ~ age2 * sicdegp + age2 * bestest2 + age2 * race + (age2 | childid),
+  data = autism
+)
+
+summary(final.model.rand)
+confint(final.model.rand)
+```
+
+### Final Model Using age
+
+```{r}
+final.model.rand2 <- lmer(
+  vsae ~ age * sicdegp + age * bestest2 + age * race + (age | childid),
+  data = autism
+)
+
+summary(final.model.rand2)
+confint(final.model.rand2)
+```
+
+# ============================
+# 7. FINAL MODELS DIAGNOSTICS
+# ============================
+
+## **1. Basic Residual Diagnostics**
+
+```r
+# Choose your final model
+m <- final.model.rand2
+
+# Extract residuals and fitted values
+diag_df <- tibble(
+  fitted = fitted(m),
+  resid  = resid(m),
+  abs_resid = abs(resid(m)),
+  childid = autism$childid
+)
+
+# Residual vs Fitted
+diag_df %>%
+  ggplot(aes(x = fitted, y = resid)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, color = "red") +
+  labs(title = "Residuals vs Fitted", x = "Fitted Values", y = "Residuals") +
+  theme_bw()
+```
+
+---
+
+## **2. Normality of Residuals**
+
+```r
+diag_df %>%
+  ggplot(aes(sample = resid)) +
+  stat_qq(alpha = 0.5) +
+  stat_qq_line(color = "red") +
+  labs(title = "Normal Q-Q Plot of Residuals") +
+  theme_bw()
+```
+
+---
+
+## **3. Scale–Location Plot (Homoscedasticity)**
+
+```r
+diag_df %>%
+  ggplot(aes(x = fitted, y = sqrt(abs_resid))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  labs(title = "Scale–Location Plot", y = "√|Residuals|") +
+  theme_bw()
+```
+
+---
+
+## **4. Residuals by Subject (Check for Patterns)**
+
+```r
+diag_df %>%
+  ggplot(aes(x = fitted, y = resid, group = childid)) +
+  geom_line(alpha = 0.3) +
+  labs(title = "Residual Trajectories by Subject") +
+  theme_bw()
+```
+
+This helps detect subjects with unusual patterns or heterogeneity.
+
+---
+
+## **5. Random Effects Diagnostics**
+
+```r
+# Extract random effects
+ranef_df <- ranef(m)$childid %>%
+  rownames_to_column("childid") %>%
+  as_tibble()
+
+# Intercept distribution
+ranef_df %>%
+  ggplot(aes(x = `(Intercept)`)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +
+  labs(title = "Distribution of Random Intercepts") +
+  theme_bw()
+
+# Slope distribution
+ranef_df %>%
+  ggplot(aes(x = age)) +
+  geom_histogram(bins = 30, fill = "darkgreen", alpha = 0.7) +
+  labs(title = "Distribution of Random Slopes (Age)") +
+  theme_bw()
+```
+
+---
+
+## **6. Random Effects Q-Q Plots**
+
+```r
+# Intercept QQ
+ranef_df %>%
+  ggplot(aes(sample = `(Intercept)`)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "Q-Q Plot: Random Intercepts") +
+  theme_bw()
+
+# Slope QQ
+ranef_df %>%
+  ggplot(aes(sample = age)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "Q-Q Plot: Random Slopes (Age)") +
+  theme_bw()
+```
+
+---
+
+## **7. Observed vs Fitted Values**
+
+```r
+diag_df %>%
+  ggplot(aes(x = fitted, y = autism$vsae)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  labs(title = "Observed vs Fitted Values", y = "Observed VSAE") +
+  theme_bw()
+```
+
+---
+
+## **8. Influence Diagnostics (Optional but Useful)**
+
+Mixed models don’t have simple influence measures, but **influence.ME** is the standard.
+
+```r
+library(influence.ME)
+
+infl <- influence(m, group = "childid")
+
+# Cook's distance
+plot(infl, which = "cook")
+```
+
