@@ -1,0 +1,300 @@
+---
+title: "BIST0650 Project"
+author: "Aaron Niecestro"
+date: "12/7/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+### Loading Packages
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(tableone)
+library(lme4)
+library(lmerTest)
+```
+
+### Loading Dataset
+
+```{r}
+autism <- read.csv("~/BIST0650 Applied Longitudinal Data Analysis/BIST0650 Final Project/BIST050_Project_Data/autism.csv")
+attach(autism)
+```
+
+### Summary Statistics
+
+```{r}
+# names of columns in the data
+names(autism)
+
+# Summary Statistics
+summary(autism)
+
+# look at a few rows of the data
+head(autism)
+
+# overall size of data set
+dim(autism)
+
+# how many subjects?
+length(unique(childid)) # patients in each clinic
+
+# sum basic summary stats (these aren't great, but semi-useful)
+## Numeric
+table(childid)
+table(age)
+table(age2)
+table(vsae)
+table(obs)
+## Categorical
+table(age)
+table(age2)
+table(sicdegp)
+table(gender)
+table(race)
+table(bestest2)
+table(unique(obs))
+
+mean(vsae)
+```
+
+```{r}
+# Tables for Variables 
+myVars <- c("age", "bestest2", "gender", "race", "sicdegp")
+
+catVars <- c("age", "age2", "bestest2", "childid", "gender", "obs", "race", "sicdegp", "vsae")
+
+tab1 <- CreateTableOne(vars = myVars, strata = "bestest2" , 
+                       data = autism, factorVars = catVars)
+print(tab1, formatOptions = list(big.mark = ","))
+
+tab2 <- CreateTableOne(vars = myVars, strata = "gender" , 
+                       data = autism, factorVars = catVars)
+print(tab2, formatOptions = list(big.mark = ","))
+
+tab3 <- CreateTableOne(vars = myVars, strata = "race" , 
+                       data = autism, factorVars = catVars)
+print(tab3, formatOptions = list(big.mark = ","))
+
+tab4 <- CreateTableOne(vars = myVars, strata = "sicdegp" , 
+                       data = autism, factorVars = catVars)
+print(tab4, formatOptions = list(big.mark = ","))
+
+tab5 <- CreateTableOne(vars = myVars, strata = "obs" , 
+                       data = autism, factorVars = catVars)
+print(tab5, formatOptions = list(big.mark = ","))
+```
+
+### Graphs
+
+```{r}
+## Boxplots
+ggplot(autism, aes(x=as.factor(sicdegp), y=vsae)) + geom_boxplot()
+ggplot(autism, aes(x=as.factor(age), y=vsae)) + geom_boxplot()
+ggplot(autism, aes(x=as.factor(age2), y=vsae)) + geom_boxplot()
+ggplot(autism, aes(x=as.factor(gender), y=vsae)) + geom_boxplot()
+ggplot(autism, aes(x=as.factor(race), y=vsae)) + geom_boxplot()
+ggplot(autism, aes(x=as.factor(bestest2), y=vsae)) + geom_boxplot()
+ggplot(autism, aes(x=as.factor(obs), y=vsae)) + geom_boxplot()
+
+## Spaghetti Plot over time
+(spag.plot <- ggplot(autism, aes(x = age, y = vsae, group = childid))+
+   geom_line(col=childid) + 
+   labs(title = "VSAE Score Over Visit Number",
+        y = "VSAE Score", x = "Visit Number",
+        color = "Child ID") +
+   theme_bw() + theme(legend.position = "bottom"))
+
+## spaghetti plot over time - stratified on bestest2
+spag.plot + labs(title = "Spaghetti Plot over Time Stratified on Diagnosis",
+                 y = "VSAE Score", x = "Visit Number",
+                 color = "Child ID") + facet_grid(. ~ bestest2)
+
+## spaghetti plot over time - stratified on race
+spag.plot + labs(title = "Spaghetti Plot over Time Stratified on Race",
+                 y = "VSAE Score", x = "Visit Number",
+                 color = "Child ID") + facet_grid(. ~ race)
+
+## spaghetti plot over time - stratified on gender
+spag.plot + labs(title = "Spaghetti Plot over Time Stratified on Gender",
+                 y = "VSAE Score", x = "Visit Number",
+                 color = "Child ID") + facet_grid(. ~ gender)
+
+## spaghetti plot over time - stratified on language
+spag.plot + labs(title = "Spaghetti Plot over Time Stratified on Language",
+                 y = "VSAE Score", x = "Visit Number",
+                 color = "Child ID") + facet_grid(. ~ sicdegp)
+```
+
+### Final Graphs
+
+```{r}
+ggplot(autism, aes(x=as.factor(age), y=vsae)) + geom_boxplot() +
+   labs(title = "VSAE Score over Children's Age by Diagnosis",
+        y = "VSAE Score", x = "Age of Children (in years)")+ 
+   theme_bw()
+
+ggplot(autism, aes(x=as.factor(age), y=vsae)) + geom_boxplot() + facet_grid(~bestest2) +
+   labs(title = "VSAE Score over Children's Age by Diagnosis",
+        y = "VSAE Score", x = "Age of Children (in years)")+ 
+   theme_bw()
+
+ggplot(autism, aes(x=as.factor(age), y=vsae)) + geom_boxplot() + facet_grid(~race) + 
+   labs(title = "VSAE Score over Children's Age by Race",
+        y = "VSAE Score", x = "Age of Children (in years)")+ 
+   theme_bw()
+
+autism$language = factor(sicdegp, levels=c("low", "med", "high"))
+
+ggplot(autism, aes(x=as.factor(age), y=vsae)) + geom_boxplot() + facet_grid(~language) + 
+   labs(title = "VSAE Score over Children's Age by Language Development Score",
+        y = "VSAE Score", x = "Age of Children (in years)") + 
+   theme_bw()
+
+ggplot(autism, aes(x = age, y = vsae, group = childid))+
+   geom_line(col=childid) + 
+   labs(title = "Plot of VSAE Score over  Children's Age",
+        y = "VSAE Score", x = "Age of Children (in years)",
+        color = "Child ID") +
+   theme_bw() + theme(legend.position = "bottom") + 
+   scale_x_continuous(breaks=c(2,3,5,9,13)) 
+
+## spaghetti plot over time - stratified on bestest2
+spag.plot + labs(title = "Spaghetti Plot over Time Stratified on Diagnosis",
+                 y = "VSAE Score", x = "Visit Number",
+                 color = "Child ID") + facet_grid(. ~ bestest2) + 
+   scale_x_continuous(breaks=c(2,3,5,9,13)) 
+
+## spaghetti plot over time - stratified on race
+spag.plot + labs(title = "Plot over Chidlren's Age Stratified on Race",
+                 y = "VSAE Score", x = "Age of Children (in years)",
+                 color = "Child ID") + facet_grid(. ~ race) + 
+   scale_x_continuous(breaks=c(2,3,5,9,13)) 
+
+autism$language = factor(sicdegp, levels=c("low", "med", "high"))
+
+## spaghetti plot over time - stratified on language
+spag.plot + labs(title = "Plot over Chidlren's Age Stratified on Language",
+                 y = "VSAE Score", x = "Age of Children (in years)",
+                 color = "Child ID") + facet_grid(. ~ autism$language) +
+   scale_x_continuous(breaks=c(2,3,5,9,13)) 
+```
+
+### Models
+
+```{r}
+autism <- autism %>% mutate(sicdegp = as.factor(sicdegp))
+autism$sicdegp <- relevel(autism$sicdegp, ref = "low")
+
+## Question A
+
+qa.remodel1 <- lmer(vsae ~ age + sicdegp + (age | childid), data=autism)
+summary(qa.remodel1) # model summary
+confint(qa.remodel1) # confidence intervals for the model
+
+qa.remodel2 <- lmer(vsae ~ age + sicdegp + age*sicdegp + (age | childid), data=autism)
+summary(qa.remodel2) # model summary
+confint(qa.remodel2) # confidence intervals for the model
+
+anova(qa.remodel1, qa.remodel2)
+```
+
+```{r}
+## Question B
+
+qb.remodel1 <- lmer(vsae ~ age + bestest2 + (age | childid))
+summary(qb.remodel1) # model summary
+confint(qb.remodel1) # confidence intervals for the model
+
+qb.remodel2 <- lmer(vsae ~ age + bestest2 + age*bestest2 + (age | childid))
+summary(qb.remodel2) # model summary
+confint(qb.remodel2) # confidence intervals for the model
+
+anova(qb.remodel1, qb.remodel2)
+```
+
+```{r}
+## Question C - Other Covariates Part 1
+
+qc.remodel1 <- lmer(vsae ~ age + gender + (age | childid))
+summary(qc.remodel1) # model summary
+confint(qc.remodel1) # confidence intervals for the model
+
+qc.remodel2 <- lmer(vsae ~ age + gender + age*gender + (age | childid))
+summary(qc.remodel2) # model summary
+confint(qc.remodel2) # confidence intervals for the model
+
+anova(qc.remodel1, qc.remodel2)
+```
+
+```{r}
+## Question C - Other Covariates Part 2
+
+qd.remodel1 <- lmer(vsae ~ age + race + (age | childid))
+summary(qd.remodel1) # model summary
+confint(qd.remodel1) # confidence intervals for the model
+
+qd.remodel2 <- lmer(vsae ~ age + race + age*race + (age | childid))
+summary(qd.remodel2) # model summary
+confint(qd.remodel2) # confidence intervals for the model
+
+anova(qd.remodel1, qd.remodel2)
+```
+
+```{r}
+## Question C - Other Covariates Part 2
+
+qe.remodel1 <- lmer(vsae ~ age + gender + race + (age | childid))
+summary(qe.remodel1) # model summary
+confint(qe.remodel1) # confidence intervals for the model
+
+qe.remodel2 <- lmer(vsae ~ age + gender + race + gender*race + (age | childid))
+summary(qe.remodel2) # model summary
+confint(qe.remodel2) # confidence intervals for the model
+
+anova(qe.remodel1, qe.remodel2)
+```
+
+
+```{r}
+fc.remodel1 <- lmer(vsae ~ age + sicdegp + bestest2 + race + 
+                       age*sicdegp + age*bestest2 + age*race + (age | childid))
+
+fc.remodel2 <- lmer(vsae ~ age + sicdegp + bestest2 + race +
+                       age*sicdegp + age*bestest2 + age*race + (age | childid))
+
+anova(fc.remodel1, fc.remodel2)
+```
+
+### Final Model for Random Intercept and Slope
+
+```{r}
+final.model.rand <- lmer(vsae ~ age2 + sicdegp + bestest2 + race + age2*sicdegp + 
+                            age2*bestest2 + age2*race + (age2 | childid), data=autism)
+summary(final.model.rand) # model summary
+confint(final.model.rand) # confidence intervals for the model
+```
+
+```{r}
+final.model.rand2 <- lmer(vsae ~ age + sicdegp + bestest2 + race + age*sicdegp + 
+                            age*bestest2 + age*race + (age | childid), data=autism)
+summary(final.model.rand2) # model summary
+confint(final.model.rand2) # confidence intervals for the model
+
+## Note - There is a difference in the random intercepts and intercepts depending if you use age or age2
+## Slightly tighter confidence intervals for age2 then age
+## Depending if use age vs age2 => ONLY the main effects for sicdegp, bestest2, and race change
+```
+
+Population Model:\
+$VSAE_{ij} = 5.521 + 1.368*Age_{ij} + 0.243Language=Medium_{ij} - 3.216Language=Medium_{ij} - 2.251Diagnosis=PDD_{ij} - 4.645Race=White_{ij} + 0.325Age_{ij}Language=Medium_{ij} + 3.824Age_{ij}Language=High_{ij} + 1.7Age_{ij}Diagnosis=PDD + 1.809Age_{ij}Language=Medium_{ij}$
+
+Within Subject Model: \
+$VSAE_{ij} = 5.521 + 1.368*Age_{ij} + 0.243Language=Medium_{ij} - 3.216Language=Medium_{ij} - 2.251Diagnosis=PDD_{ij} - 4.645Race=White_{ij} + 0.325Age_{ij}Language=Medium_{ij} + 3.824Age_{ij}Language=High_{ij} + 1.7Age_{ij}Diagnosis=PDD + 1.809Age_{ij}Language=Medium_{ij} + 8.361 + b_{age_{ij}}$
+
+
