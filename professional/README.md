@@ -150,7 +150,7 @@ Below is a compact comparison of the **same tasks** implemented in **all four wo
 | Speed | Fast | Fast | Moderate | Fastest |
 | Best use case | Statistical modeling | General DS/ML | R‑quality mixed models in Python | Tidyverse‑style Python |
 
-# **What the stars mean in the comparison table**
+## **What the stars mean in the comparison table**
 
 The stars are a **qualitative rating system** used to compare the four workflows across several dimensions:
 
