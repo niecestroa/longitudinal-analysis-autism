@@ -150,6 +150,37 @@ Below is a compact comparison of the **same tasks** implemented in **all four wo
 | Speed | Fast | Fast | Moderate | Fastest |
 | Best use case | Statistical modeling | General DS/ML | R‑quality mixed models in Python | Tidyverse‑style Python |
 
+# **What the stars mean in the comparison table**
+
+The stars are a **qualitative rating system** used to compare the four workflows across several dimensions:
+
+- Data wrangling  
+- Visualization  
+- Mixed‑effects modeling  
+- Random‑effects support  
+- Model comparison  
+- Speed  
+- Ease of use  
+
+They are **not numerical scores** and they’re not tied to any external standard.  
+They simply express **relative strengths** across the four methods.
+
+Here’s how to interpret them:
+
+| Stars | Meaning |
+|-------|---------|
+| ⭐⭐⭐⭐⭐ | Best‑in‑class / industry‑leading / most complete |
+| ⭐⭐⭐⭐ | Very strong / highly capable |
+| ⭐⭐⭐ | Solid / usable but with notable limitations |
+| ⭐⭐ | Works but has significant constraints |
+| ⭐ | Barely functional or not recommended for that category |
+
+### Example  
+- R gets ⭐⭐⭐⭐⭐ for mixed models because **lme4 is the gold standard**.  
+- Python Option A gets ⭐⭐ for mixed models because **statsmodels.MixedLM is limited**.  
+- Python Option B gets ⭐⭐⭐⭐⭐ because it literally uses **lme4 inside Python**.  
+- Python Option C gets ⭐⭐ because it uses the same limited MixedLM as Option A.
+
 ---
 
 # **7. Summary of Findings**
