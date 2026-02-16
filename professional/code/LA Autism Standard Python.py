@@ -1,60 +1,66 @@
 # Last Editted on December 10, 2026
 # Longitudinal autism analysis – Option A:
 # pandas + seaborn + matplotlib + statsmodels + tableone
+# This version mirrors your R script but uses standard scientific Python tools.
 
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
 
-from tableone import TableOne
-from statsmodels.regression.mixed_linear_model import MixedLM
-import statsmodels.api as sm
+# ============================
+# IMPORTS
+# ============================
 
-sns.set(style="whitegrid")
+import pandas as pd              # pandas = Python's data frame library (similar to dplyr/tidyverse)
+import numpy as np               # numpy = numerical computing (R uses base numeric types)
+import seaborn as sns            # seaborn = high-level plotting (similar to ggplot2 themes)
+import matplotlib.pyplot as plt  # matplotlib = low-level plotting backend (ggplot2 equivalent)
+
+from tableone import TableOne    # Python version of R's tableone package
+from statsmodels.regression.mixed_linear_model import MixedLM  # Mixed-effects models
+import statsmodels.api as sm     # for QQ plots and diagnostics
+
+sns.set(style="whitegrid")       # sets a ggplot-like theme
 
 
 # ============================
 # 1. LOAD + CLEAN DATA
 # ============================
 
+# In R: read_csv("path") %>% mutate(...)
+# In Python: pd.read_csv() + .assign() or direct column assignment
 autism = (
     pd.read_csv(
         r"~/BIST0650 Applied Longitudinal Data Analysis/BIST0650 Final Project/BIST050_Project_Data/autism.csv"
     )
 )
 
-# Categorical encodings (match R)
+# Convert variables to categorical (R uses factor(); Python uses .astype("category"))
 autism["sicdegp"] = pd.Categorical(autism["sicdegp"], categories=["low", "med", "high"], ordered=True)
 autism["bestest2"] = autism["bestest2"].astype("category")
 autism["gender"] = autism["gender"].astype("category")
 autism["race"] = autism["race"].astype("category")
 autism["childid"] = autism["childid"].astype("category")
 
-print(autism.info())
-print(autism.head())
+print(autism.info())   # R equivalent: str(autism)
+print(autism.head())   # R equivalent: head(autism)
 
 
 # ============================
 # 2. SUMMARY STATISTICS
 # ============================
 
+# R: summary(autism)
 print("\n=== Summary ===")
 print(autism.describe(include="all"))
 
-print("\n=== Head ===")
-print(autism.head())
-
-print("\n=== Dim ===")
-print(autism.shape)
-
+# R: n_distinct(childid)
 print("\n=== Unique subjects ===")
 print(autism["childid"].nunique())
 
+# R: table(variable)
 for col in ["childid", "age", "age2", "vsae", "obs", "gender", "race", "sicdegp", "bestest2"]:
     print(f"\n=== Count: {col} ===")
     print(autism[col].value_counts(dropna=False))
 
+# R: mean(vsae)
 print("\n=== Mean VSAE ===")
 print(autism["vsae"].mean())
 
@@ -63,9 +69,11 @@ print(autism["vsae"].mean())
 # 3. TABLEONE SUMMARIES
 # ============================
 
+# Same variables as R
 myVars = ["age", "bestest2", "gender", "race", "sicdegp"]
 catVars = ["age", "age2", "bestest2", "childid", "gender", "obs", "race", "sicdegp", "vsae"]
 
+# Python TableOne is nearly identical to R's version
 def print_tableone(groupby):
     print(f"\n=== TableOne stratified by {groupby} ===")
     t1 = TableOne(
@@ -85,6 +93,8 @@ for g in ["bestest2", "gender", "race", "sicdegp", "obs"]:
 # 4. VISUALIZATIONS
 # ============================
 
+# R: ggplot(autism, aes(...)) + geom_boxplot()
+# Python: seaborn.boxplot()
 def boxplot_var(var):
     plt.figure(figsize=(6, 4))
     sns.boxplot(data=autism, x=var, y="vsae")
@@ -95,7 +105,8 @@ def boxplot_var(var):
 for v in ["sicdegp", "age", "age2", "gender", "race", "bestest2", "obs"]:
     boxplot_var(v)
 
-# Spaghetti plot
+# R: ggplot spaghetti plot with geom_line(aes(group=childid))
+# Python: must loop manually unless using plotnine (Option C)
 plt.figure(figsize=(8, 5))
 for cid, df_sub in autism.groupby("childid"):
     plt.plot(df_sub["age"], df_sub["vsae"], alpha=0.3)
@@ -105,7 +116,7 @@ plt.title("VSAE Score Over Time by Child")
 plt.tight_layout()
 plt.show()
 
-# Stratified spaghetti plots (diagnosis, race, gender, language)
+# Faceted spaghetti plots (similar to facet_grid in ggplot2)
 def spaghetti_facet(by):
     g = sns.FacetGrid(autism, col=by, col_wrap=3, sharey=True, sharex=True, height=3)
     g.map_dataframe(
@@ -126,13 +137,13 @@ for by in ["bestest2", "race", "gender", "sicdegp"]:
 
 
 # ============================
-# 5. MIXED MODELS (HELPER)
+# 5. MIXED MODELS (statsmodels)
 # ============================
 
+# R: lmer(vsae ~ age * sicdegp + (age | childid))
+# Python: MixedLM.from_formula("vsae ~ age * sicdegp", groups="childid", re_formula="~ age")
+
 def fit_mixed(formula, re_formula="~ age", data=autism):
-    """
-    Fit a mixed model with random intercept and slope for age by childid.
-    """
     md = MixedLM.from_formula(
         formula,
         groups="childid",
@@ -144,18 +155,17 @@ def fit_mixed(formula, re_formula="~ age", data=autism):
     print(m.summary())
     return m
 
+# R: anova(m1, m2)
+# Python: statsmodels does NOT support LRT for mixed models → compare AIC/BIC manually
 def compare_models(form1, form2, data=autism):
-    """
-    Rough comparison via AIC/BIC/logLik (no exact anova like lme4).
-    """
     m1 = fit_mixed(form1, data=data)
     m2 = fit_mixed(form2, data=data)
 
-    print("\n=== Model Comparison ===")
+    print("\n=== Model Comparison (AIC/BIC/LL) ===")
     print("Model 1:", form1)
-    print("  AIC:", m1.aic, "BIC:", m1.bic, "llf:", m1.llf)
+    print("  AIC:", m1.aic, "BIC:", m1.bic, "LL:", m1.llf)
     print("Model 2:", form2)
-    print("  AIC:", m2.aic, "BIC:", m2.bic, "llf:", m2.llf)
+    print("  AIC:", m2.aic, "BIC:", m2.bic, "LL:", m2.llf)
 
     return m1, m2
 
@@ -170,7 +180,7 @@ qa_m1, qa_m2 = compare_models(
     "vsae ~ age * sicdegp"
 )
 
-# Question B: Diagnosis (bestest2)
+# Question B: Diagnosis
 qb_m1, qb_m2 = compare_models(
     "vsae ~ age + bestest2",
     "vsae ~ age * bestest2"
@@ -215,11 +225,13 @@ final_model_age = fit_mixed(
 
 
 # ============================
-# 8. DIAGNOSTICS FOR FINAL MODEL
+# 8. DIAGNOSTICS
 # ============================
 
-m = final_model_age  # choose which final model to diagnose
+# Choose final model for diagnostics
+m = final_model_age
 
+# R: fitted(m), resid(m)
 autism["fitted"] = m.fittedvalues
 autism["resid"] = autism["vsae"] - autism["fitted"]
 autism["abs_resid"] = autism["resid"].abs()
@@ -232,7 +244,7 @@ plt.title("Residuals vs Fitted")
 plt.tight_layout()
 plt.show()
 
-# 2. Normal Q-Q plot of residuals
+# 2. Normal Q-Q plot
 sm.qqplot(autism["resid"], line="45")
 plt.title("Normal Q-Q Plot of Residuals")
 plt.tight_layout()
@@ -264,9 +276,8 @@ plt.ylabel("Residual")
 plt.tight_layout()
 plt.show()
 
-# 5. Random effects diagnostics (approximate)
-# statsmodels MixedLM stores random effects in random_effects dict
-re_dict = m.random_effects  # {childid: array([intercept, slope])}
+# 5. Random effects diagnostics
+re_dict = m.random_effects
 re_df = (
     pd.DataFrame.from_dict(re_dict, orient="index")
     .reset_index()
